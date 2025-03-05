@@ -71,6 +71,8 @@ if (process.env.NODE_ENV !== 'production') {
     credentials: true,
   });
 }
+const caeRoutes = require('./routes/authRoutes');
+app.use('/cae', caeRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
