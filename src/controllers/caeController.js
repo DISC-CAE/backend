@@ -38,7 +38,7 @@ const caeController = {
       } else if (entity == 'energy') {
         table_entity_name = 'Energy';
       } else if (entity == 'environment_justice') {
-        table_entity_name = 'Environment Justice';
+        table_entity_name = 'Environmental Justice';
       } else if (entity == 'natural_habitat') {
         table_entity_name = 'Natural Habitat';
       } else if (entity == 'climate_action') {
@@ -90,6 +90,69 @@ const caeController = {
         details:
           process.env.NODE_ENV === 'development' ? error.message : undefined,
       });
+    }
+  },
+  async addInitiative(req, res) {
+    try {
+      const {
+        organization_name,
+        initiative_name,
+        event_date,
+        event_location,
+        event_description,
+      } = req.body;
+
+      if (
+        !organization_name ||
+        !initiative_name ||
+        !event_date ||
+        !event_location ||
+        !event_description
+      ) {
+        return res.status(400).json({ error: 'All fields are required' });
+      }
+
+      const { data: entityData, error: entityError } = await supabase
+        .from('entities')
+        .select('id')
+        .eq('name', organization_name) // Use the dynamic entity name
+        .maybeSingle();
+
+      console.log('Entity query result:', entityData, entityError);
+
+      if (entityError) {
+        console.error('Error fetching entity:', entityError);
+        return res.status(400).json({ error: entityError.message });
+      }
+
+      if (!entityData || !entityData.id) {
+        return res.status(404).json({
+          error: `Entity '${organization_name}' not found in database`,
+        });
+      }
+
+      console.log('Inserting new event:', req.body);
+
+      const { data, error } = await supabase
+        .from('initiatives')
+        .insert([
+          {
+            entity_id: entityData.id,
+            name: initiative_name,
+            description: event_description,
+          },
+        ])
+        .select();
+
+      if (error) {
+        console.error('Error inserting event:', error);
+        return res.status(400).json({ error: error.message });
+      }
+
+      res.status(201).json({ message: 'Event created successfully', data });
+    } catch (error) {
+      console.error('Internal server error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   },
 };
