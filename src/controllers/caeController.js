@@ -38,7 +38,7 @@ const caeController = {
       } else if (entity == 'energy') {
         table_entity_name = 'Energy';
       } else if (entity == 'environment_justice') {
-        table_entity_name = 'Environment Justice';
+        table_entity_name = 'Environmental Justice';
       } else if (entity == 'natural_habitat') {
         table_entity_name = 'Natural Habitat';
       } else if (entity == 'climate_action') {
