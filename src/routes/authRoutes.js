@@ -16,4 +16,13 @@ router.post('/reset-password', authController.requestPasswordReset);
 router.put('/reset-password', authController.updatePassword);
 router.get('/verify-recovery', authController.handlePasswordRecovery);
 
+//-------------------------------Mine--------------------------------------------/
+
+const caeController = require('../controllers/caeController');
+router.get('/fetch-events', caeController.getAllEvents);
+router.get('/fetch-scoreboard', caeController.fetchScoreboard);
+router.post('/add-initiative', caeController.addInitiative);
+
+//-------------------------------Mine--------------------------------------------/
+
 module.exports = router;

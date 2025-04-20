@@ -490,6 +490,23 @@ const authController = {
       res.status(500).json({ error: 'Failed to update password' });
     }
   },
+
+  async getAllEvents(req, res) {
+    try {
+      console.log('Getting all Events...');
+      const { eventdata, error } = await supabase.from('events').select('*');
+
+      if (error) {
+        console.error('Error fetching Events:', error);
+        return res.status(400).json({ error: error.message });
+      }
+
+      res.status(200).json(eventdata);
+    } catch (error) {
+      console.error('Get all events error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
 };
 
 module.exports = authController;
