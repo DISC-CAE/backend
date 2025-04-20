@@ -197,6 +197,61 @@ const caeController = {
       res.status(500).json({ error: 'Internal server error' });
     }
   },
+  async deleteInitiative(req, res) {
+    try {
+      const { programName, initiativeName } = req.body;
+  
+      if (!programName || !initiativeName) {
+        return res.status(400).json({ error: 'programName and initiativeName are required' });
+      }
+  
+      const { data: program, error: programError } = await supabase
+        .from('programs')
+        .select('id')
+        .eq('name', programName)
+        .maybeSingle();
+  
+      if (programError || !program) {
+        return res.status(400).json({ error: 'Invalid programName' });
+      }
+  
+      const { data: initiative, error: initiativeError } = await supabase
+        .from('initiatives')
+        .select('id')
+        .eq('name', initiativeName)
+        .eq('program_id', program.id)
+        .maybeSingle();
+  
+      if (initiativeError || !initiative) {
+        return res.status(400).json({ error: 'Initiative not found under that program' });
+      }
+  
+      // Delete associated metrics first
+      const { error: metricsDeleteError } = await supabase
+        .from('metrics')
+        .delete()
+        .eq('initiative_id', initiative.id);
+  
+      if (metricsDeleteError) {
+        return res.status(400).json({ error: 'Failed to delete metrics' });
+      }
+  
+      // Then delete the initiative
+      const { error: initiativeDeleteError } = await supabase
+        .from('initiatives')
+        .delete()
+        .eq('id', initiative.id);
+  
+      if (initiativeDeleteError) {
+        return res.status(400).json({ error: 'Failed to delete initiative' });
+      }
+  
+      res.status(200).json({ message: 'Initiative deleted successfully' });
+    } catch (err) {
+      console.error('Internal server error:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
 };
 
 module.exports = caeController;

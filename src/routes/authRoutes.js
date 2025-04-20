@@ -22,6 +22,7 @@ const caeController = require('../controllers/caeController');
 router.get('/fetch-scoreboard', caeController.fetchScoreboard);
 router.get('/fetch-initiatives', caeController.fetchInitiative);
 router.post('/add-initiative', caeController.addInitiative);
+router.delete('/delete-initiative', caeController.deleteInitiative);
 
 //-------------------------------Mine--------------------------------------------/
 
