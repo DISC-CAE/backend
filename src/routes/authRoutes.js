@@ -19,8 +19,8 @@ router.get('/verify-recovery', authController.handlePasswordRecovery);
 //-------------------------------Mine--------------------------------------------/
 
 const caeController = require('../controllers/caeController');
-router.get('/fetch-events', caeController.getAllEvents);
 router.get('/fetch-scoreboard', caeController.fetchScoreboard);
+router.get('/fetch-initiatives', caeController.fetchInitiative);
 router.post('/add-initiative', caeController.addInitiative);
 
 //-------------------------------Mine--------------------------------------------/

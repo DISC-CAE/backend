@@ -9,11 +9,19 @@ const caeController = {
         return res.status(400).json({ error: 'programName is required' });
       }
   
+      const { data: allPrograms, error } = await supabase
+        .from('programs')
+        .select('*');
+
+      console.log(allPrograms, error);
+            
       const { data: program, error: programError } = await supabase
         .from('programs')
         .select('id')
         .eq('name', programName)
         .maybeSingle();
+
+      console.log(program, programError);
   
       if (programError || !program) {
         return res.status(400).json({ error: 'Invalid programName' });
@@ -23,6 +31,8 @@ const caeController = {
         .from('initiatives')
         .select('name, description, image_url')
         .eq('program_id', program.id);
+
+      console.log("Initatives", initiatives, initiativesError)
   
       if (initiativesError) {
         return res.status(400).json({ error: initiativesError.message });
