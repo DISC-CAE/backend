@@ -20,9 +20,10 @@ router.get('/verify-recovery', authController.handlePasswordRecovery);
 
 const caeController = require('../controllers/caeController');
 router.get('/fetch-scoreboard', caeController.fetchScoreboard);
-router.get('/fetch-initiatives', caeController.fetchInitiative);
+router.get('/fetch-initiative', caeController.fetchInitiative);
 router.post('/add-initiative', caeController.addInitiative);
 router.delete('/delete-initiative', caeController.deleteInitiative);
+router.post('/edit-initiative', caeController.editInitiative);
 
 //-------------------------------Mine--------------------------------------------/
 
