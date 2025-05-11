@@ -1,4 +1,22 @@
 const supabase = require('../config/supabase');
+const multer = require('multer');
+const path = require('path');
+
+// Configure multer for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG and GIF are allowed.'));
+    }
+  },
+});
 
 const caeController = {
   async fetchScoreboard(req, res) {
@@ -57,7 +75,6 @@ const caeController = {
         initiativeName,
         description,
         modesOfAction,
-        imageUrl,
         metrics, // { People: [...], Place: [...], Policy: [...] }
       } = req.body;
 
@@ -66,11 +83,35 @@ const caeController = {
         !initiativeName ||
         !description ||
         !modesOfAction ||
-        !imageUrl ||
-        !metrics
+        !metrics ||
+        !req.file
       ) {
-        return res.status(400).json({ error: 'All fields are required' });
+        return res
+          .status(400)
+          .json({ error: 'All fields including image are required' });
       }
+
+      // Upload image to Supabase Storage
+      const fileBuffer = req.file.buffer;
+      const fileName = `${Date.now()}-${req.file.originalname}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('initiative-images')
+        .upload(fileName, fileBuffer, {
+          contentType: req.file.mimetype,
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        return res.status(400).json({ error: 'Failed to upload image' });
+      }
+
+      // Get public URL for the uploaded image
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('initiative-images').getPublicUrl(fileName);
 
       const { data: program, error: programError } = await supabase
         .from('programs')
@@ -85,7 +126,7 @@ const caeController = {
       const initiativeInsert = {
         name: initiativeName,
         description,
-        image_url: imageUrl,
+        image_url: publicUrl,
         program_id: program.id,
         mode_serve: modesOfAction.includes('Serve'),
         mode_educate: modesOfAction.includes('Educate'),
@@ -99,6 +140,8 @@ const caeController = {
         .maybeSingle();
 
       if (initiativeError || !initiative) {
+        // If initiative creation fails, delete the uploaded image
+        await supabase.storage.from('initiative-images').remove([fileName]);
         return res.status(400).json({ error: 'Failed to insert initiative' });
       }
 
@@ -120,6 +163,9 @@ const caeController = {
         .insert(metricEntries);
 
       if (metricError) {
+        // If metrics insertion fails, delete both the initiative and the image
+        await supabase.from('initiatives').delete().eq('id', initiative.id);
+        await supabase.storage.from('initiative-images').remove([fileName]);
         return res.status(400).json({ error: 'Failed to insert metrics' });
       }
 
@@ -266,7 +312,6 @@ const caeController = {
         programName,
         initiativeName,
         description,
-        imageUrl,
         modesOfAction,
         metrics, // { People: [...], Place: [...], Policy: [...] }
       } = req.body;
@@ -275,7 +320,6 @@ const caeController = {
         !programName ||
         !initiativeName ||
         !description ||
-        !imageUrl ||
         !modesOfAction ||
         !metrics
       ) {
@@ -296,7 +340,7 @@ const caeController = {
       // Get initiative by name and program
       const { data: initiative, error: initiativeError } = await supabase
         .from('initiatives')
-        .select('id')
+        .select('id, image_url')
         .eq('name', initiativeName)
         .eq('program_id', program.id)
         .maybeSingle();
@@ -305,6 +349,43 @@ const caeController = {
         return res
           .status(400)
           .json({ error: 'Initiative not found under program' });
+      }
+
+      let imageUrl = initiative.image_url;
+
+      // If a new image is uploaded, handle the upload
+      if (req.file) {
+        // Delete old image if it exists
+        if (initiative.image_url) {
+          const oldFileName = initiative.image_url.split('/').pop();
+          await supabase.storage
+            .from('initiative-images')
+            .remove([oldFileName]);
+        }
+
+        // Upload new image
+        const fileBuffer = req.file.buffer;
+        const fileName = `${Date.now()}-${req.file.originalname}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('initiative-images')
+          .upload(fileName, fileBuffer, {
+            contentType: req.file.mimetype,
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          return res.status(400).json({ error: 'Failed to upload image' });
+        }
+
+        // Get public URL for the uploaded image
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('initiative-images').getPublicUrl(fileName);
+
+        imageUrl = publicUrl;
       }
 
       // Update initiative
