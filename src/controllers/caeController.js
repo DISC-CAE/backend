@@ -326,6 +326,10 @@ const caeController = {
         return res.status(400).json({ error: 'All fields are required' });
       }
 
+      // Parse JSON strings from FormData
+      const parsedModesOfAction = JSON.parse(modesOfAction);
+      const parsedMetrics = JSON.parse(metrics);
+
       // Get program ID
       const { data: program, error: programError } = await supabase
         .from('programs')
@@ -394,9 +398,9 @@ const caeController = {
         .update({
           description,
           image_url: imageUrl,
-          mode_serve: modesOfAction.includes('Serve'),
-          mode_educate: modesOfAction.includes('Educate'),
-          mode_advocate: modesOfAction.includes('Advocate'),
+          mode_serve: parsedModesOfAction.includes('Serve'),
+          mode_educate: parsedModesOfAction.includes('Educate'),
+          mode_advocate: parsedModesOfAction.includes('Advocate'),
           updated_at: new Date(),
         })
         .eq('id', initiative.id);
@@ -418,7 +422,7 @@ const caeController = {
       // Insert new metrics
       const metricEntries = [];
       for (const category of ['People', 'Place', 'Policy']) {
-        const metricArray = metrics[category] || [];
+        const metricArray = parsedMetrics[category] || [];
         for (const { label, value } of metricArray) {
           metricEntries.push({
             initiative_id: initiative.id,
