@@ -146,6 +146,10 @@ const caeController = {
           .json({ error: 'All fields including image are required' });
       }
 
+      // Parse JSON strings from FormData
+      const parsedModesOfAction = JSON.parse(modesOfAction);
+      const parsedMetrics = JSON.parse(metrics);
+
       // Upload image to Supabase Storage
       const fileBuffer = req.file.buffer;
       const fileName = `${Date.now()}-${req.file.originalname}`;
@@ -183,9 +187,9 @@ const caeController = {
         description,
         image_url: publicUrl,
         program_id: program.id,
-        mode_serve: modesOfAction.includes('Serve'),
-        mode_educate: modesOfAction.includes('Educate'),
-        mode_advocate: modesOfAction.includes('Advocate'),
+        mode_serve: parsedModesOfAction.includes('Serve'),
+        mode_educate: parsedModesOfAction.includes('Educate'),
+        mode_advocate: parsedModesOfAction.includes('Advocate'),
       };
 
       const { data: initiative, error: initiativeError } = await supabase
@@ -202,7 +206,7 @@ const caeController = {
 
       const metricEntries = [];
       for (const category of ['People', 'Place', 'Policy']) {
-        const metricArray = metrics[category] || [];
+        const metricArray = parsedMetrics[category] || [];
         for (const { label, values, showInScoreboard } of metricArray) {
           // Insert each value as a separate row for the same label
           for (const valueEntry of values) {
