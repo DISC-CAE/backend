@@ -47,7 +47,7 @@ const caeController = {
 
       const { data: initiatives, error: initiativesError } = await supabase
         .from('initiatives')
-        .select('name, description, image_url')
+        .select('name, description, image_url, id')
         .eq('program_id', program.id);
 
       console.log('Initatives', initiatives, initiativesError);
@@ -56,13 +56,68 @@ const caeController = {
         return res.status(400).json({ error: initiativesError.message });
       }
 
-      const formatted = initiatives.map((i) => ({
-        name: i.name,
-        description: i.description,
-        imageUrl: i.image_url,
-      }));
+      // Fetch aggregated metrics for each initiative
+      const initiativesWithMetrics = await Promise.all(
+        initiatives.map(async (initiative) => {
+          const { data: metrics, error: metricError } = await supabase
+            .from('metrics')
+            .select('label, value, ppp, show_in_scoreboard')
+            .eq('initiative_id', initiative.id)
+            .eq('show_in_scoreboard', true);
 
-      res.status(200).json({ initiatives: formatted });
+          if (metricError) {
+            console.error(
+              'Error fetching metrics for initiative:',
+              initiative.id,
+              metricError
+            );
+            return {
+              name: initiative.name,
+              description: initiative.description,
+              imageUrl: initiative.image_url,
+              metrics: { People: [], Place: [], Policy: [] },
+            };
+          }
+
+          // Aggregate metrics by label (sum values) - only for metrics marked to show in scoreboard
+          const aggregatedMetrics = {
+            People: [],
+            Place: [],
+            Policy: [],
+          };
+
+          const labelTotals = {};
+
+          for (const m of metrics) {
+            const key = `${m.ppp}-${m.label}`;
+            if (!labelTotals[key]) {
+              labelTotals[key] = {
+                label: m.label,
+                total: 0,
+                category: m.ppp,
+              };
+            }
+            labelTotals[key].total += parseInt(m.value) || 0;
+          }
+
+          // Convert to the expected format
+          Object.values(labelTotals).forEach((item) => {
+            aggregatedMetrics[item.category].push({
+              label: item.label,
+              value: item.total,
+            });
+          });
+
+          return {
+            name: initiative.name,
+            description: initiative.description,
+            imageUrl: initiative.image_url,
+            metrics: aggregatedMetrics,
+          };
+        })
+      );
+
+      res.status(200).json({ initiatives: initiativesWithMetrics });
     } catch (err) {
       console.error('Internal server error:', err);
       res.status(500).json({ error: 'Internal server error' });
@@ -148,13 +203,20 @@ const caeController = {
       const metricEntries = [];
       for (const category of ['People', 'Place', 'Policy']) {
         const metricArray = metrics[category] || [];
-        for (const { label, value } of metricArray) {
-          metricEntries.push({
-            initiative_id: initiative.id,
-            label,
-            value,
-            ppp: category,
-          });
+        for (const { label, values, showInScoreboard } of metricArray) {
+          // Insert each value as a separate row for the same label
+          for (const valueEntry of values) {
+            metricEntries.push({
+              initiative_id: initiative.id,
+              label,
+              value: valueEntry.value,
+              date_recorded:
+                valueEntry.date || new Date().toISOString().split('T')[0],
+              notes: valueEntry.notes || '',
+              ppp: category,
+              show_in_scoreboard: showInScoreboard ?? true,
+            });
+          }
         }
       }
 
@@ -215,7 +277,7 @@ const caeController = {
 
       const { data: metrics, error: metricError } = await supabase
         .from('metrics')
-        .select('label, value, ppp')
+        .select('label, value, ppp, date_recorded, notes, show_in_scoreboard')
         .eq('initiative_id', initiative.id);
 
       if (metricError) {
@@ -228,9 +290,29 @@ const caeController = {
         Policy: [],
       };
 
+      // Group metrics by category and label, collecting all values with dates and notes for each label
       for (const m of metrics) {
         if (groupedMetrics[m.ppp]) {
-          groupedMetrics[m.ppp].push({ label: m.label, value: m.value });
+          // Find existing label or create new one
+          let labelEntry = groupedMetrics[m.ppp].find(
+            (entry) => entry.label === m.label
+          );
+          if (!labelEntry) {
+            labelEntry = {
+              label: m.label,
+              values: [],
+              showInScoreboard: m.show_in_scoreboard ?? true,
+            };
+            groupedMetrics[m.ppp].push(labelEntry);
+          } else {
+            // Update showInScoreboard to the most recent value (they should all be the same for a label)
+            labelEntry.showInScoreboard = m.show_in_scoreboard ?? true;
+          }
+          labelEntry.values.push({
+            value: m.value,
+            date: m.date_recorded,
+            notes: m.notes || '',
+          });
         }
       }
 
@@ -423,13 +505,20 @@ const caeController = {
       const metricEntries = [];
       for (const category of ['People', 'Place', 'Policy']) {
         const metricArray = parsedMetrics[category] || [];
-        for (const { label, value } of metricArray) {
-          metricEntries.push({
-            initiative_id: initiative.id,
-            label,
-            value,
-            ppp: category,
-          });
+        for (const { label, values, showInScoreboard } of metricArray) {
+          // Insert each value as a separate row for the same label
+          for (const valueEntry of values) {
+            metricEntries.push({
+              initiative_id: initiative.id,
+              label,
+              value: valueEntry.value,
+              date_recorded:
+                valueEntry.date || new Date().toISOString().split('T')[0],
+              notes: valueEntry.notes || '',
+              ppp: category,
+              show_in_scoreboard: showInScoreboard ?? true,
+            });
+          }
         }
       }
 
